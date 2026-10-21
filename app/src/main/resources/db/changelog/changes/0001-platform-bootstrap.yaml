@@ -1,0 +1,29 @@
+# Technical marker only. Business tables are designed by the learner later.
+databaseChangeLog:
+  - changeSet:
+      id: 0001-platform-bootstrap
+      author: stockflow-platform
+      changes:
+        - createTable:
+            tableName: platform_marker
+            columns:
+              - column:
+                  name: id
+                  type: integer
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: description
+                  type: varchar(120)
+                  constraints:
+                    nullable: false
+        - insert:
+            tableName: platform_marker
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 1
+              - column:
+                  name: description
+                  value: Local learning platform is ready

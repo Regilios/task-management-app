@@ -1,0 +1,10 @@
+.git
+.idea
+.env
+.tools
+.cache
+**/target
+docs
+learning
+AGENTS.md
+*.log

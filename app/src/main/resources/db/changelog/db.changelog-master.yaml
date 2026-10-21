@@ -1,0 +1,4 @@
+databaseChangeLog:
+  - include:
+      file: changes/0001-platform-bootstrap.yaml
+      relativeToChangelogFile: true

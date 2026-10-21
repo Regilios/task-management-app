@@ -1,0 +1,42 @@
+name: stockflow-learning
+services:
+  postgres:
+    # PostgreSQL 16.12 Alpine, pinned by content digest.
+    image: postgres@sha256:97ff59a4e30e08d1c11bdcd9455e7832368c0572b576c9092cde2df4ae5552a3
+    environment:
+      POSTGRES_DB: ${DB_NAME:-stockflow}
+      POSTGRES_USER: ${DB_USER:-stockflow}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-stockflow_local}
+    ports:
+      - "127.0.0.1:${DB_PORT:-55432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+  app:
+    build: .
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-stockflow}
+      DB_USER: ${DB_USER:-stockflow}
+      DB_PASSWORD: ${DB_PASSWORD:-stockflow_local}
+      APP_PORT: 8080
+      APP_BIND_ADDRESS: 0.0.0.0
+    ports:
+      - "127.0.0.1:${APP_PORT:-18080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/actuator/health/readiness"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
+volumes:
+  postgres-data:

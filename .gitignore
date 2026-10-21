@@ -1,0 +1,20 @@
+.idea/
+*.iml
+.vscode/
+.env
+.env.*
+!.env.example
+.tools/
+.cache/
+**/target/
+*.log
+*.pid
+!docs/evidence/.gitkeep
+
+# Local mentoring, planning and working notes stay outside the public repository.
+/AGENTS.md
+/learning/
+/docs/*
+!/docs/SETUP.md
+!/docs/stages/
+!/docs/stages/**
