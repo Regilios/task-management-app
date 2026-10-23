@@ -5,6 +5,7 @@ import dev.stockflow.core.exceprion.TicketException;
 import dev.stockflow.core.service.MessageListService;
 import lombok.Getter;
 
+import java.time.Instant;
 import java.util.*;
 
 public class Dialog {
@@ -15,6 +16,24 @@ public class Dialog {
     @Getter
     MessageListService messageListService = new MessageListService();
     List<Ticket> ticketsList = new ArrayList<>();
+
+    public Dialog(String dialogId, String clientId, String ticketId, Instant openedAt) {
+        if (Objects.isNull(dialogId) || dialogId.trim().isEmpty()) {
+            throw new DialogException("Не указан или неверный идентификатор диалога");
+        }
+        if (Objects.isNull(clientId) || clientId.trim().isEmpty()) {
+            throw new DialogException("Не указан или неверный идентификатор клиента");
+        }
+        if (Objects.isNull(ticketId) || ticketId.trim().isEmpty()) {
+            throw new TicketException("Не указан или неверный идентификатор обращения");
+        }
+        if (Objects.isNull(openedAt) || ticketId.trim().isEmpty()) {
+            throw new IllegalArgumentException("Не указано время открытия");
+        }
+        this.dialogId = dialogId.trim();
+        this.clientId = clientId.trim();
+        this.openTicket(ticketId.trim(), openedAt);
+    }
 
     public Dialog(String dialogId, String clientId, String ticketId) {
         if (Objects.isNull(dialogId) || dialogId.trim().isEmpty()) {
@@ -52,6 +71,12 @@ public class Dialog {
 
     public void addMessage(Message message) {
         messageListService.addMessage(message);
+    }
+
+    public Ticket openTicket(String ticketId, Instant openedAt) {
+        Ticket ticket = new Ticket(ticketId, dialogId, openedAt);
+        ticketsList.add(ticket);
+        return ticket;
     }
 
     public Ticket openTicket(String ticketId) {

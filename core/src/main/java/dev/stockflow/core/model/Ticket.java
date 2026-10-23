@@ -4,29 +4,48 @@ import dev.stockflow.core.exceprion.TicketException;
 import dev.stockflow.core.state.StatusTicket;
 import lombok.Getter;
 
+import java.time.Instant;
 import java.util.Objects;
 
 @Getter
 public class Ticket {
+    private final Instant openedAt;
     private String ticketId;
     private String operatorId;
     private String dialogId;
     private StatusTicket statusTicket = StatusTicket.OPEN;
 
+    public Ticket(String ticketId, String dialogId, Instant openedAt) {
+        if (Objects.isNull(ticketId) || ticketId.trim().isEmpty()) {
+            throw new TicketException("Не указан или неверный идентификатор обращения");
+        }
+        if (Objects.isNull(dialogId) || dialogId.trim().isEmpty()) {
+            throw new TicketException("Не указан id диалога");
+        }
+        if (Objects.isNull(openedAt)) {
+            throw new IllegalArgumentException("Не указано время открытия");
+        }
+
+        this.ticketId = ticketId.trim();
+        this.openedAt = openedAt;
+        this.dialogId = dialogId.trim();
+    }
+
     public Ticket(String ticketId, String dialogId) {
         if (Objects.isNull(ticketId) || ticketId.trim().isEmpty()) {
             throw new TicketException("Не указан или неверный идентификатор обращения");
         }
-        this.ticketId = ticketId.trim();
-
         if (Objects.isNull(dialogId) || dialogId.trim().isEmpty()) {
             throw new TicketException("Не указан id диалога");
         }
+
+        this.ticketId = ticketId.trim();
         this.dialogId = dialogId.trim();
+        this.openedAt = Instant.now();
     }
 
-    public void setOperatorId(String operatorId) {
 
+    public void setOperatorId(String operatorId) {
         if (Objects.isNull(operatorId)) {
             throw new IllegalArgumentException("ID оператора не назначен");
         }

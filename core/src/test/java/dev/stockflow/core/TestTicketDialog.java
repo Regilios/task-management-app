@@ -7,6 +7,8 @@ import dev.stockflow.core.service.DialogListService;
 import dev.stockflow.core.service.MessageListService;
 import dev.stockflow.core.state.Direction;
 import dev.stockflow.core.state.StatusTicket;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 
@@ -14,9 +16,16 @@ import java.time.Instant;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class TestTicketDialog {
+    private static final Log log = LogFactory.getLog(TestTicketDialog.class);
     final Instant now = Instant.parse("2026-06-06T12:00:00Z");
+    final Instant beforePeriod = Instant.parse("2026-10-23T09:59:00Z");
+    final Instant periodStart = Instant.parse("2026-10-23T10:00:00Z");
+    final Instant middleOfPeriod = Instant.parse("2026-10-23T10:30:00Z");
+    final Instant periodEnd = Instant.parse("2026-10-23T11:00:00Z");
+    final Instant afterPeriod = Instant.parse("2026-10-23T11:01:00Z");
 
     @Test
     @DisplayName("1: Новый диалог получает одно открытое обращение и пустую историю")
@@ -629,4 +638,134 @@ public class TestTicketDialog {
         assertEquals(expectedOperatorId, ticket.getOperatorId(), "Ответственный оператор обращения " + ticket.getTicketId());
     }
 
+
+    @Test
+    public void findOpenTickets_currentStatuses_returnsOnlyOpen() {
+        DialogListService dialogService = new DialogListService();
+        Dialog annaDialog = dialogService.open("DIALOG-ANNA-1", "CLIENT-ANNA", "TICKET-ANNA-1", periodStart);
+        Ticket annaTicket = annaDialog.getTicketById("TICKET-ANNA-1");
+
+        Dialog borisDialog = dialogService.open("DIALOG-BORIS-1", "CLIENT-BORIS", "TICKET-BORIS-1", periodStart);
+        Ticket borisTicket = borisDialog.getTicketById("TICKET-BORIS-1");
+
+        Dialog veraDialog = dialogService.open("DIALOG-VERA-1", "CLIENT-VERA", "TICKET-VERA-1", periodStart);
+        Ticket veraTicket = veraDialog.getTicketById("TICKET-VERA-1");
+
+        borisDialog.assignTicket("TICKET-BORIS-1", "OPERATOR-1");
+        veraDialog.assignTicket("TICKET-VERA-1", "OPERATOR-1");
+        veraDialog.closeTicket("TICKET-VERA-1", "OPERATOR-1");
+
+        List<Ticket> ticketList = dialogService.findOpenTickets(periodStart, periodEnd);
+        assertIterableEquals(List.of(annaTicket), ticketList);
+        assertEquals(StatusTicket.OPEN, annaTicket.getStatusTicket());
+        assertEquals(StatusTicket.ASSIGNED, borisTicket.getStatusTicket());
+        assertEquals(StatusTicket.CLOSED, veraTicket.getStatusTicket());
+    }
+
+    @Test
+    public void findOpenTickets_inclusiveBounds_selectsExactPeriod() {
+        DialogListService dialogService = new DialogListService();
+
+        Dialog endDialog = dialogService.open("DIALOG-END", "CLIENT-END", "TICKET-END", periodEnd);
+        Ticket endTicket = endDialog.getTicketById("TICKET-END");
+
+        Dialog beforeDialog = dialogService.open("DIALOG-BEFORE", "CLIENT-BEFORE", "TICKET-BEFORE", beforePeriod);
+        Ticket beforeTicket = beforeDialog.getTicketById("TICKET-BEFORE");
+
+        Dialog middleDialog = dialogService.open("DIALOG-MIDDLE", "CLIENT-MIDDLE", "TICKET-MIDDLE", middleOfPeriod);
+        Ticket middleTicket = middleDialog.getTicketById("TICKET-MIDDLE");
+
+        Dialog afterDialog = dialogService.open("DIALOG-AFTER", "CLIENT-AFTER", "TICKET-AFTER", afterPeriod);
+        Ticket afterTicket = afterDialog.getTicketById("TICKET-AFTER");
+
+        Dialog startDialog = dialogService.open("DIALOG-START", "CLIENT-START", "TICKET-START", periodStart);
+        Ticket startTicket = startDialog.getTicketById("TICKET-START");
+
+        assertIterableEquals(List.of(startTicket, middleTicket, endTicket), dialogService.findOpenTickets(periodStart, periodEnd));
+        assertIterableEquals(List.of(middleTicket), dialogService.findOpenTickets(middleOfPeriod, middleOfPeriod));
+    }
+
+    @Test
+    public void findOpenTickets_equalTimes_ordersByDialogId() {
+        DialogListService dialogService = new DialogListService();
+        Dialog borisDialog = dialogService.open("DIALOG-BORIS-1", "CLIENT-BORIS", "TICKET-BORIS-1", periodStart);
+        Dialog annaDialog = dialogService.open("DIALOG-ANNA-1", "CLIENT-ANNA", "TICKET-ANNA-1", periodStart);
+
+        Ticket borisTicket = borisDialog.getTicketById("TICKET-BORIS-1");
+        Ticket annaTicket = annaDialog.getTicketById("TICKET-ANNA-1");
+
+        assertIterableEquals(List.of(annaTicket, borisTicket), dialogService.findOpenTickets(periodStart, periodStart));
+    }
+
+    @Test
+    public void findOpenTickets_noMatches_returnsEmpty() {
+        DialogListService dialogService = new DialogListService();
+        assertTrue(dialogService.findOpenTickets(periodStart, periodStart).isEmpty());
+        Dialog annaDialog = dialogService.open("DIALOG-ANNA-1", "CLIENT-ANNA", "TICKET-ANNA-1", beforePeriod);
+        assertTrue(dialogService.findOpenTickets(periodStart, periodStart).isEmpty());
+    }
+
+    @Test
+    public void findOpenTickets_invalidPeriod_throws() {
+        DialogListService dialogService = new DialogListService();
+        assertThrows(IllegalArgumentException.class, () -> dialogService.findOpenTickets(null, periodEnd));
+        assertThrows(IllegalArgumentException.class, () -> dialogService.findOpenTickets(periodStart, null));
+        assertThrows(IllegalArgumentException.class, () -> dialogService.findOpenTickets(periodEnd, periodStart));
+    }
+
+    @Test
+    public void ticket_openingTime_isFixedForEachTicket() {
+        DialogListService dialogService = new DialogListService();
+        Dialog firstDialog = dialogService.open("DIALOG-ANNA-1", "CLIENT-ANNA", "TICKET-ANNA-1", beforePeriod);
+        Ticket firstTicket = firstDialog.getTicketById("TICKET-ANNA-1");
+        assertEquals(beforePeriod, firstTicket.getOpenedAt());
+
+        Dialog secondDialog = dialogService.open("DIALOG-ANNA-1", "CLIENT-ANNA", "TICKET-ANNA-1", periodStart);
+        Ticket secondTicket = secondDialog.getTicketById("TICKET-ANNA-1");
+        assertEquals(firstTicket, secondTicket);
+        assertEquals(beforePeriod, secondTicket.getOpenedAt());
+
+        firstDialog.assignTicket("TICKET-ANNA-1", "OPERATOR-1");
+        Dialog thirdDialog = dialogService.open("DIALOG-ANNA-1", "CLIENT-ANNA", "TICKET-ANNA-1", middleOfPeriod);
+        Ticket thirdTicket = thirdDialog.getTicketById("TICKET-ANNA-1");
+        assertEquals(firstTicket, thirdTicket);
+        assertEquals(beforePeriod, thirdTicket.getOpenedAt());
+
+        firstDialog.closeTicket("TICKET-ANNA-1", "OPERATOR-1");
+
+        Dialog secondDialog2 = dialogService.open("DIALOG-ANNA-1", "CLIENT-ANNA", "TICKET-ANNA-2", periodEnd);
+        Ticket secondTicket2 = secondDialog2.getTicketById("TICKET-ANNA-2");
+        assertEquals(beforePeriod, firstTicket.getOpenedAt());
+        assertEquals(periodEnd, secondTicket2.getOpenedAt());
+
+        assertThrows(IllegalArgumentException.class, () -> new Ticket("TICKET-DIRECT", "DIALOG-DIRECT", null));
+        assertThrows(IllegalArgumentException.class, () -> dialogService.open("DIALOG-MISSING", "CLIENT-MISSING", "TICKET-MISSING", null));
+        assertThrows(IllegalArgumentException.class, () -> dialogService.open("DIALOG-ANNA-1", "CLIENT-ANNA", "TICKET-ANNA-2", null));
+        assertSame(secondTicket2, firstDialog.getTicketById("TICKET-ANNA-2"));
+        assertEquals(periodEnd, secondTicket2.getOpenedAt());
+        assertFalse(dialogService.getDialogList().containsKey("DIALOG-MISSING"));
+
+    }
+
+    @Test
+    public void findOpenTickets_result_keepsSnapshotAndOriginalTickets() {
+        DialogListService dialogService = new DialogListService();
+        Dialog annaDialog = dialogService.open("DIALOG-ANNA-1", "CLIENT-ANNA", "TICKET-ANNA-1", periodStart);
+        Ticket annaTicket = annaDialog.getTicketById("TICKET-ANNA-1");
+        List<Ticket> savedResult = dialogService.findOpenTickets(periodStart, periodEnd);
+
+        assertSame(savedResult.getFirst(), annaTicket);
+        assertThrows(UnsupportedOperationException.class, () -> savedResult.add(annaTicket));
+        assertThrows(UnsupportedOperationException.class, () -> savedResult.remove(0));
+        assertThrows(UnsupportedOperationException.class, () -> savedResult.set(0, annaTicket));
+
+        annaDialog.assignTicket("TICKET-ANNA-1", "OPERATOR-1");
+        Dialog borisDialog = dialogService.open("DIALOG-BORIS-1", "CLIENT-BORIS", "TICKET-BORIS-1", middleOfPeriod);
+        Ticket borisTicket = borisDialog.getTicketById("TICKET-BORIS-1");
+
+        assertIterableEquals(savedResult, List.of(annaTicket));
+        assertEquals(StatusTicket.ASSIGNED, annaTicket.getStatusTicket());
+        List<Ticket> newResult = dialogService.findOpenTickets(periodStart, periodEnd);
+        assertIterableEquals(newResult, List.of(borisTicket));
+    }
 }
